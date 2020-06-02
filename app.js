@@ -8,19 +8,25 @@ var PORT = 8080;
 /*** SETUP ***/
 /*************/
 var express = require('express');
-var http = require('http');
-var bodyParser = require('body-parser')
-var main = express()
-var server = http.createServer(main)
+var https = require('https');
+var fs = require("fs");
+var cors = require('cors')
+var bodyParser = require('body-parser');
+const options = {
+  key: fs.readFileSync("./keys/key.pem"),
+  cert: fs.readFileSync("./keys/cert.pem"),
+  passphrase: 'rugved'
+};
+var main = express();
+var server = https.createServer(options,main);
 var io  = require('socket.io').listen(server);
-//io.set('log level', 2);
-
 server.listen(PORT, null, function() {
     console.log("Listening on port " + PORT);
 });
 //main.use(express.bodyParser());
 
-main.get('/', function(req, res){ res.sendFile(__dirname + '/client.html'); });
+main.get('/', function(req, res){ res.sendFile(__dirname + '/public/client.html'); });
+main.get('/jquery.min.js', function(req, res){ res.sendFile(__dirname + '/public/jquery.min.js'); });
 // main.get('/index.html', function(req, res){ res.sendfile('newclient.html'); });
 // main.get('/client.html', function(req, res){ res.sendfile('newclient.html'); });
 
