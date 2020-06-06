@@ -4,7 +4,8 @@
   "description": "",
   "main": "app.js",
   "scripts": {
-    "start": "node app.js"
+    "start": "node app.js",
+    "dev" : "nodemon app.js"
   },
   "dependencies": {
     "body-parser": "^1.15.2",
@@ -13,5 +14,8 @@
     "socket.io": "^1.4.8"
   },
   "author": "Rugved Mahamune",
-  "license": "ISC"
+  "license": "ISC",
+  "devDependencies": {
+    "nodemon": "^2.0.4"
+  }
 }

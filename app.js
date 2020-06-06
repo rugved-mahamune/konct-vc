@@ -27,6 +27,7 @@ server.listen(PORT, null, function() {
 
 main.get('/', function(req, res){ res.sendFile(__dirname + '/public/client.html'); });
 main.get('/jquery.min.js', function(req, res){ res.sendFile(__dirname + '/public/jquery.min.js'); });
+main.get('/styles.css', function(req, res){ res.sendFile(__dirname + '/public/styles.css'); });
 // main.get('/index.html', function(req, res){ res.sendfile('newclient.html'); });
 // main.get('/client.html', function(req, res){ res.sendfile('newclient.html'); });
 
@@ -51,6 +52,7 @@ var sockets = {};
 io.sockets.on('connection', function (socket) {
     socket.channels = {};
     sockets[socket.id] = socket;
+    console.log("Brand New Connection!")
 
     console.log("["+ socket.id + "] connection accepted");
     socket.on('disconnect', function () {

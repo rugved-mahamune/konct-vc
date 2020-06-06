@@ -8,6 +8,7 @@
         <!-- <script src="https://webrtc.googlecode.com/svn/trunk/samples/js/base/adapter.js"></script> -->
         <script src="https://rtcmulticonnection.herokuapp.com/dist/RTCMultiConnection.js"></script>
         <script src="https://rtcmulticonnection.herokuapp.com/node_modules/webrtc-adapter/out/adapter.js"></script>
+        <link rel="stylesheet" type="text/css" href="styles.css"/>
         <style>
             html, body { 
                 background-color: #333; 
@@ -25,7 +26,8 @@
             var SIGNALING_SERVER = "https://localhost:8080/";
             var USE_AUDIO = true;
             var USE_VIDEO = true;
-            var DEFAULT_CHANNEL = 'some-global-channel-name';
+            var USE_SCREEN = false;
+            var DEFAULT_CHANNEL = '';
             var MUTE_AUDIO_BY_DEFAULT = false;
 
             /** You should probably use a different stun server doing commercial stuff **/
@@ -33,6 +35,24 @@
             var ICE_SERVERS = [
                 {url:"stun:stun.l.google.com:19302"}
             ];
+
+            function toggleSrc() {
+                let videSelector = document.getElementById("video-share");
+                let screenSelector = document.getElementById("screen-share");
+                if(USE_VIDEO)
+                {
+                    USE_SCREEN = true;
+                    USE_VIDEO = false;
+                    videSelector.style.backgroundColor = "#555555";
+                    screenSelector.style.backgroundColor = "#008CBA";
+                }
+                else {
+                    USE_SCREEN = false;
+                    USE_VIDEO = true;
+                    videSelector.style.backgroundColor = "#008CBA";
+                    screenSelector.style.backgroundColor = "#555555";
+                }
+            }
         </script>
 
 
@@ -41,12 +61,20 @@
             var local_media_stream = null; /* our own microphone / webcam */
             var peers = {};                /* keep track of our peer connections, indexed by peer_id (aka socket.io id) */
             var peer_media_elements = {};  /* keep track of our <video>/<audio> tags, indexed by peer_id */
-                
+            
+            function startCasting() {
+                let channelId = document.getElementById('group-id').text; 
+                DEFAULT_CHANNEL = "rugved";
+                init();
+            }
             function init() {
-                shareScreen();
+                navigator.getUserMedia = ( navigator.getUserMedia ||
+                           navigator.webkitGetUserMedia ||
+                           navigator.mozGetUserMedia ||
+                           navigator.msGetUserMedia);
+                //USE_SCREEN ? shareScreen() : shareVideo();
                 console.log("Connecting to signaling server");
                 signaling_socket = io(SIGNALING_SERVER);
-                signaling_socket = io();
                 signaling_socket.on('connect', function() {
                     console.log("Connected to signaling server");
                     setup_local_media(function() {
@@ -235,21 +263,36 @@
 
 
             function shareScreen() {
-                var connection = new RTCMultiConnection();
+                navigator.mediaDevices.getUserMedia({video: {mediaSource: 'screen'}}).then( (sstream)=> {
+                    local_media_stream = sstream;
+                    var local_media = USE_SCREEN ? $("<video>") : $("<audio>");
+                    local_media.attr("autoplay", "autoplay");
+                    local_media.attr("muted", "true"); /* always mute ourselves by default */
+                    local_media.attr("controls", "");
+                    $('body').append(local_media);
+                        attachMediaStream(local_media[0], sstream);
+                });
+            }
 
-                // by default, socket.io server is assumed to be deployed on your own URL
-                connection.socketURL = SIGNALING_SERVER;
+            function shareVideo() {
+                    navigator.getUserMedia({"audio":USE_AUDIO, "video":USE_VIDEO},
+                    function(stream) { /* user accepted access to a/v */
+                        console.log("Access granted to audio/video");
+                        local_media_stream = stream;
+                        var local_media = USE_VIDEO ? $("<video>") : $("<audio>");
+                        local_media.attr("autoplay", "autoplay");
+                        local_media.attr("muted", "true"); /* always mute ourselves by default */
+                        local_media.attr("controls", "");
+                        $('body').append(local_media);
+                        attachMediaStream(local_media[0], stream);
 
-                // comment-out below line if you do not have your own socket.io server
-                // connection.socketURL = 'https://rtcmulticonnection.herokuapp.com:443/';
-
-                connection.socketMessageEvent = 'addPeer';
-
-                connection.session = {
-                    screen: true,
-                    oneway: true
-                };
-
+                        if (callback) callback();
+                    },
+                    function() { /* user denied access to a/v */
+                        console.log("Access denied for audio/video");
+                        alert("You chose not to provide access to the camera/microphone, demo will not work.");
+                        if (errorback) errorback();
+                    });
             }
 
             /***********************/
@@ -263,28 +306,17 @@
                 /* Ask user for permission to use the computers microphone and/or camera, 
                  * attach it to an <audio> or <video> tag if they give us access. */
                 console.log("Requesting access to local audio / video inputs");
-
-                const displayMediaOptions = {
-                video: {
-                    cursor: "always"
-                },
-                audio: {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    sampleRate: 44100
-                }
-                }
                 navigator.getUserMedia = ( navigator.getUserMedia || navigator.getUserMedia ||
                        navigator.webkitGetUserMedia ||
                        navigator.mozGetUserMedia ||
                        navigator.msGetUserMedia);
-
                 attachMediaStream = function(element, stream) {
                     console.log('DEPRECATED, attach`MediaStream will soon be removed.');
                     element.srcObject = stream;
                  };
-
-                navigator.getUserMedia({"audio":USE_AUDIO, "video":USE_VIDEO},
+                 if(USE_VIDEO)
+                 {
+                    navigator.getUserMedia({"audio":USE_AUDIO, "video":USE_VIDEO},
                     function(stream) { /* user accepted access to a/v */
                         console.log("Access granted to audio/video");
                         local_media_stream = stream;
@@ -294,10 +326,8 @@
                         local_media.attr("controls", "");
                         $('body').append(local_media);
                         
-                        navigator.mediaDevices.getUserMedia({video: {mediaSource: 'screen'}}).then( (sstream)=> {
-                            attachMediaStream(local_media[0], sstream);
-                        });
-//                        attachMediaStream(local_media[0], stream);
+
+                       attachMediaStream(local_media[0], stream);
 
                         if (callback) callback();
                     },
@@ -306,22 +336,41 @@
                         alert("You chose not to provide access to the camera/microphone, demo will not work.");
                         if (errorback) errorback();
                     });
-            }
-            function startScreenCapture() {
-                if (navigator.getDisplayMedia) {
-                return navigator.getDisplayMedia({video: true});
-                } else if (navigator.mediaDevices.getDisplayMedia) {
-                return navigator.mediaDevices.getDisplayMedia({video: true});
-                } else {
-                return navigator.mediaDevices.getUserMedia({video: {mediaSource: 'screen'}});
-                }
+                 }
+                 else if(USE_SCREEN) {
+                    navigator.mediaDevices.getUserMedia({video: {mediaSource: 'screen'}}).then( (sstream)=> {
+                        console.log("Access granted to audio/video");
+                        local_media_stream = sstream;
+                        var local_media = USE_SCREEN ? $("<video>") : $("<audio>");
+                        local_media.attr("autoplay", "autoplay");
+                        local_media.attr("muted", "true"); /* always mute ourselves by default */
+                        local_media.attr("controls", "");
+                        $('body').append(local_media);
+                        
+
+                        attachMediaStream(local_media[0], sstream);
+
+                        if (callback) callback();
+                            
+                        });
+                 }
             }
         </script>
     </head>
-    <body onload='init()'>
+    <body>
+        <div style="text-align: center;">
+            <div style="display: inline-block;margin-top: 25px;">
+                <label for="group-id" style="color:white;margin-right:20px">Meeting-id: </label>
+                <input type="text" id="group-id"/>
+                <input type="button" value="Join" id="join-btn" onclick="startCasting()"/><br/><br/>
+                <button id="screen-share" class="button" onclick="toggleSrc();">Share Screen</button>&nbsp;&nbsp;
+                <button id="video-share" class="button" style="background-color: #008CBA;" onclick="toggleSrc();">Share Video</button>
+            </div>
+        </div>
         <!-- 
         the <video> anapplicationudio> tags are all added and removed dynamically
         in 'onAddStream', 'setup_local_media', and 'removePeer'/'disconnect'
         -->
+
     </body>
 </html>
