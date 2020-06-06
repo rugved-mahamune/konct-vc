@@ -6,6 +6,8 @@
              methods. When RTC becomes a more solid standard, this adapter should no
              longer be necessary. -->
         <!-- <script src="https://webrtc.googlecode.com/svn/trunk/samples/js/base/adapter.js"></script> -->
+        <script src="https://rtcmulticonnection.herokuapp.com/dist/RTCMultiConnection.js"></script>
+        <script src="https://rtcmulticonnection.herokuapp.com/node_modules/webrtc-adapter/out/adapter.js"></script>
         <style>
             html, body { 
                 background-color: #333; 
@@ -39,8 +41,9 @@
             var local_media_stream = null; /* our own microphone / webcam */
             var peers = {};                /* keep track of our peer connections, indexed by peer_id (aka socket.io id) */
             var peer_media_elements = {};  /* keep track of our <video>/<audio> tags, indexed by peer_id */
-
+                
             function init() {
+                shareScreen();
                 console.log("Connecting to signaling server");
                 signaling_socket = io(SIGNALING_SERVER);
                 signaling_socket = io();
@@ -231,7 +234,23 @@
             }
 
 
+            function shareScreen() {
+                var connection = new RTCMultiConnection();
 
+                // by default, socket.io server is assumed to be deployed on your own URL
+                connection.socketURL = SIGNALING_SERVER;
+
+                // comment-out below line if you do not have your own socket.io server
+                // connection.socketURL = 'https://rtcmulticonnection.herokuapp.com:443/';
+
+                connection.socketMessageEvent = 'addPeer';
+
+                connection.session = {
+                    screen: true,
+                    oneway: true
+                };
+
+            }
 
             /***********************/
             /** Local media stuff **/
@@ -245,8 +264,17 @@
                  * attach it to an <audio> or <video> tag if they give us access. */
                 console.log("Requesting access to local audio / video inputs");
 
-
-                navigator.getUserMedia = ( navigator.getUserMedia ||
+                const displayMediaOptions = {
+                video: {
+                    cursor: "always"
+                },
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    sampleRate: 44100
+                }
+                }
+                navigator.getUserMedia = ( navigator.getUserMedia || navigator.getUserMedia ||
                        navigator.webkitGetUserMedia ||
                        navigator.mozGetUserMedia ||
                        navigator.msGetUserMedia);
@@ -265,7 +293,11 @@
                         local_media.attr("muted", "true"); /* always mute ourselves by default */
                         local_media.attr("controls", "");
                         $('body').append(local_media);
-                        attachMediaStream(local_media[0], stream);
+                        
+                        navigator.mediaDevices.getUserMedia({video: {mediaSource: 'screen'}}).then( (sstream)=> {
+                            attachMediaStream(local_media[0], sstream);
+                        });
+//                        attachMediaStream(local_media[0], stream);
 
                         if (callback) callback();
                     },
@@ -274,6 +306,15 @@
                         alert("You chose not to provide access to the camera/microphone, demo will not work.");
                         if (errorback) errorback();
                     });
+            }
+            function startScreenCapture() {
+                if (navigator.getDisplayMedia) {
+                return navigator.getDisplayMedia({video: true});
+                } else if (navigator.mediaDevices.getDisplayMedia) {
+                return navigator.mediaDevices.getDisplayMedia({video: true});
+                } else {
+                return navigator.mediaDevices.getUserMedia({video: {mediaSource: 'screen'}});
+                }
             }
         </script>
     </head>
